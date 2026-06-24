@@ -181,6 +181,9 @@ function processEXT(prevText, currText) {
 
 // ───────────────────────── Lógica de correção: CTB ─────────────────────────
 // Critério de chave: conta;fonte;composeSaldo (apenas linhas tipo 20)
+// composeSaldo é o 5º campo da linha 20 (ex: "20;05;50344;1800000;2;...").
+// Uma mesma conta;fonte pode ter múltiplas linhas 20 com composeSaldo diferente
+// (ex: 1 e 2) representando saldos distintos — NUNCA somar entre composeSaldo diferentes.
 // Corrige saldo inicial para o saldo final do mês anterior e lança a diferença
 // como movimentação tipo 21 (característica "99" — TRANSFERENCIA FINANCEIRA),
 // consolidando com movimentações 99 já existentes em vez de duplicá-las.
