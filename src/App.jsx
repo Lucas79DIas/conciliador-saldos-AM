@@ -436,6 +436,18 @@ function FileDrop({ label, fileName, onFile, accent }) {
   );
 }
 
+function Badge({ children, color }) {
+  return (
+    <span style={{
+      display: "inline-block", padding: "4px 12px", borderRadius: 6,
+      background: color || C.blue, color: "#FFFFFF",
+      fontSize: 12, fontWeight: 700, letterSpacing: 0.3,
+    }}>
+      {children}
+    </span>
+  );
+}
+
 function downloadCSV(content, filename) {
   const blob = new Blob([content], { type: "text/csv;charset=iso-8859-1" });
   const url = URL.createObjectURL(blob);
