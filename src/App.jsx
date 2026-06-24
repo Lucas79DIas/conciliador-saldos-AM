@@ -208,13 +208,13 @@ function processCTB(prevText, currText) {
   const previousLines = prevText.split(/\r?\n/).filter((l) => l.trim());
   const currentLines = currText.split(/\r?\n/).filter((l) => l.trim());
 
-  // Mapeia saldos finais do mês anterior
+  // Mapeia saldos finais do mês anterior (sempre normalizado com 2 casas decimais)
   const previousBalances = new Map();
   for (const line of previousLines) {
     const record = parseRecordCTB(line);
     if (record && record.type === "20") {
       const key = `${record.conta};${record.fonte};${record.composeSaldo}`;
-      previousBalances.set(key, record.saldoFinal || "0");
+      previousBalances.set(key, formatNumberCTB(parseNumberCTB(record.saldoFinal || "0")));
     }
   }
 
@@ -246,7 +246,7 @@ function processCTB(prevText, currText) {
     const record = parseRecordCTB(line);
     if (record && record.type === "20") {
       const key = `${record.conta};${record.fonte};${record.composeSaldo}`;
-      const saldoFinalAnterior = previousBalances.get(key) || "0";
+      const saldoFinalAnterior = previousBalances.get(key) || "0,00";
       const saldoInicialOriginal = parseNumberCTB(record.saldoInicial || "0");
       const saldoFinalAnteriorNum = parseNumberCTB(saldoFinalAnterior);
 
@@ -255,7 +255,7 @@ function processCTB(prevText, currText) {
         const movType = difference > 0 ? "1" : "2";
         adjustments.push({
           conta: record.conta, fonte: record.fonte, composeSaldo: record.composeSaldo,
-          saldoFinalAnterior, saldoInicialOriginal: record.saldoInicial || "0",
+          saldoFinalAnterior, saldoInicialOriginal: formatNumberCTB(saldoInicialOriginal),
           difference: formatNumberCTB(Math.abs(difference)), movType,
         });
       }
