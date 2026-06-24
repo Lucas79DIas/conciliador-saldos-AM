@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import JSZip from "jszip";
 
 const C = {
   bg: "#0d1117", surface: "#161b22", card: "#1c2128", border: "#30363d",
@@ -49,6 +50,73 @@ function readFileAsText(file) {
   });
 }
 
+function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function bufferToLatin1Text(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let result = "";
+  // decodifica byte a byte como ISO-8859-1 (latin1) — cada byte = 1 char code
+  for (let i = 0; i < bytes.length; i++) {
+    result += String.fromCharCode(bytes[i]);
+  }
+  return result;
+}
+
+function isZipFile(file) {
+  const name = file.name.toLowerCase();
+  return name.endsWith(".zip") || file.type === "application/zip" || file.type === "application/x-zip-compressed";
+}
+
+// Recebe um File (zip ou csv). Se for zip, abre e procura o arquivo cujo nome
+// contém "ext" (case-insensitive) e termina em .csv/.txt. Retorna { text, sourceName }.
+async function resolveExtFile(file) {
+  if (!isZipFile(file)) {
+    const text = await readFileAsText(file);
+    return { text, sourceName: file.name, fromZip: false, zipEntries: null };
+  }
+
+  const buffer = await readFileAsArrayBuffer(file);
+  const zip = await JSZip.loadAsync(buffer);
+
+  const allNames = Object.keys(zip.files).filter((n) => !zip.files[n].dir);
+
+  // Candidatos: nome contém "ext" e é .csv ou .txt
+  const candidates = allNames.filter((n) => {
+    const lower = n.toLowerCase();
+    const base = lower.split("/").pop();
+    return base.includes("ext") && (base.endsWith(".csv") || base.endsWith(".txt"));
+  });
+
+  if (candidates.length === 0) {
+    throw new Error(
+      `Nenhum arquivo "EXT" encontrado dentro do ZIP "${file.name}". Arquivos disponíveis: ${allNames.join(", ") || "(zip vazio)"}`
+    );
+  }
+
+  // Se houver mais de um candidato, prioriza o que mais se aproxima de "ext" puro (sem outros termos no meio)
+  candidates.sort((a, b) => a.length - b.length);
+  const chosen = candidates[0];
+
+  const entry = zip.files[chosen];
+  const contentBuffer = await entry.async("arraybuffer");
+  const text = bufferToLatin1Text(contentBuffer);
+
+  return {
+    text,
+    sourceName: chosen,
+    fromZip: true,
+    zipEntries: allNames,
+    zipName: file.name,
+  };
+}
+
 function Btn({ onClick, children, secondary, disabled }) {
   return (
     <button
@@ -80,7 +148,7 @@ function Card({ title, children }) {
   );
 }
 
-function FileDrop({ label, fileName, onFile, accent }) {
+function FileDrop({ label, fileName, detectedName, fromZip, onFile, accent }) {
   return (
     <div
       onDragOver={(e) => e.preventDefault()}
@@ -103,14 +171,19 @@ function FileDrop({ label, fileName, onFile, accent }) {
       <input
         id={`file-${label}`}
         type="file"
-        accept=".csv,.CSV"
+        accept=".csv,.CSV,.zip,.ZIP"
         style={{ display: "none" }}
         onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
       />
       <div style={{ fontSize: 13, color: C.sub, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 15, color: fileName ? accent : C.muted, fontWeight: 600 }}>
-        {fileName || "Clique ou arraste o CSV"}
+        {fileName || "Clique ou arraste o ZIP ou CSV"}
       </div>
+      {fromZip && detectedName && (
+        <div style={{ fontSize: 11, color: C.sub, marginTop: 8 }}>
+          📦 detectado dentro do ZIP: <strong style={{ color: accent }}>{detectedName}</strong>
+        </div>
+      )}
     </div>
   );
 }
@@ -120,6 +193,8 @@ export default function App() {
 
   const [prevFile, setPrevFile] = useState(null);
   const [currFile, setCurrFile] = useState(null);
+  const [prevDetected, setPrevDetected] = useState(null); // { fromZip, sourceName }
+  const [currDetected, setCurrDetected] = useState(null);
   const [prevRows, setPrevRows] = useState(null);
   const [currRows, setCurrRows] = useState(null);
 
@@ -129,15 +204,33 @@ export default function App() {
   const [error, setError] = useState(null);
 
   const handlePrevFile = useCallback(async (file) => {
+    setError(null);
     setPrevFile(file.name);
-    const text = await readFileAsText(file);
-    setPrevRows(parseCSV(text));
+    try {
+      const { text, sourceName, fromZip } = await resolveExtFile(file);
+      setPrevDetected({ fromZip, sourceName });
+      setPrevRows(parseCSV(text));
+    } catch (e) {
+      setError(`Mês anterior: ${e.message}`);
+      setPrevFile(null);
+      setPrevRows(null);
+      setPrevDetected(null);
+    }
   }, []);
 
   const handleCurrFile = useCallback(async (file) => {
+    setError(null);
     setCurrFile(file.name);
-    const text = await readFileAsText(file);
-    setCurrRows(parseCSV(text));
+    try {
+      const { text, sourceName, fromZip } = await resolveExtFile(file);
+      setCurrDetected({ fromZip, sourceName });
+      setCurrRows(parseCSV(text));
+    } catch (e) {
+      setError(`Mês atual: ${e.message}`);
+      setCurrFile(null);
+      setCurrRows(null);
+      setCurrDetected(null);
+    }
   }, []);
 
   const processFiles = useCallback(() => {
@@ -270,8 +363,8 @@ export default function App() {
         {step === 1 && (
           <Card title="1 · Enviar arquivos EXT">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <FileDrop label="EXT do mês ANTERIOR" fileName={prevFile} onFile={handlePrevFile} accent={C.blue} />
-              <FileDrop label="EXT do mês ATUAL" fileName={currFile} onFile={handleCurrFile} accent={C.green} />
+              <FileDrop label="EXT do mês ANTERIOR" fileName={prevFile} detectedName={prevDetected?.sourceName} fromZip={prevDetected?.fromZip} onFile={handlePrevFile} accent={C.blue} />
+              <FileDrop label="EXT do mês ATUAL" fileName={currFile} detectedName={currDetected?.sourceName} fromZip={currDetected?.fromZip} onFile={handleCurrFile} accent={C.green} />
             </div>
             <div style={{ marginTop: 20 }}>
               <Btn onClick={() => setStep(2)} disabled={!prevRows || !currRows}>
@@ -285,10 +378,14 @@ export default function App() {
         {step === 2 && (
           <Card title="2 · Confirmar processamento">
             <p style={{ color: C.sub, fontSize: 14 }}>
-              Mês anterior: <strong style={{ color: C.blue }}>{prevFile}</strong> ({prevRows.filter(r => r[0] === "20").length} linhas tipo 20)
+              Mês anterior: <strong style={{ color: C.blue }}>{prevFile}</strong>
+              {prevDetected?.fromZip && <span style={{ color: C.sub, fontSize: 12 }}> (📦 extraído: {prevDetected.sourceName})</span>}
+              {" "}({prevRows.filter(r => r[0] === "20").length} linhas tipo 20)
             </p>
             <p style={{ color: C.sub, fontSize: 14 }}>
-              Mês atual: <strong style={{ color: C.green }}>{currFile}</strong> ({currRows.filter(r => r[0] === "20").length} linhas tipo 20)
+              Mês atual: <strong style={{ color: C.green }}>{currFile}</strong>
+              {currDetected?.fromZip && <span style={{ color: C.sub, fontSize: 12 }}> (📦 extraído: {currDetected.sourceName})</span>}
+              {" "}({currRows.filter(r => r[0] === "20").length} linhas tipo 20)
             </p>
             <p style={{ color: C.sub, fontSize: 13, marginTop: 16 }}>
               Critério de equivalência: <strong>conta;fonte</strong>. Apenas linhas tipo <strong>20</strong> serão alteradas; demais tipos (30, 31, 32...) permanecem intactos.
