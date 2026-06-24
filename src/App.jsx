@@ -87,21 +87,18 @@ async function resolveExtFile(file) {
 
   const allNames = Object.keys(zip.files).filter((n) => !zip.files[n].dir);
 
-  // Candidatos: nome contém "ext" e é .csv ou .txt
+  // Padrão do TCE: o arquivo é sempre nomeado exatamente "EXT.CSV" (case-insensitive)
   const candidates = allNames.filter((n) => {
-    const lower = n.toLowerCase();
-    const base = lower.split("/").pop();
-    return base.includes("ext") && (base.endsWith(".csv") || base.endsWith(".txt"));
+    const base = n.toLowerCase().split("/").pop();
+    return base === "ext.csv";
   });
 
   if (candidates.length === 0) {
     throw new Error(
-      `Nenhum arquivo "EXT" encontrado dentro do ZIP "${file.name}". Arquivos disponíveis: ${allNames.join(", ") || "(zip vazio)"}`
+      `Nenhum arquivo "EXT.CSV" encontrado dentro do ZIP "${file.name}". Arquivos disponíveis: ${allNames.join(", ") || "(zip vazio)"}`
     );
   }
 
-  // Se houver mais de um candidato, prioriza o que mais se aproxima de "ext" puro (sem outros termos no meio)
-  candidates.sort((a, b) => a.length - b.length);
   const chosen = candidates[0];
 
   const entry = zip.files[chosen];
