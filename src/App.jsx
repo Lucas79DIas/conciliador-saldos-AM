@@ -232,13 +232,16 @@ function processCTB(prevText, currText) {
     }
   }
 
-  // Consolida movimentações 99 existentes (uma por conta;fonte;movType)
+  // Consolida movimentações 99 existentes (uma por conta;fonte;composeSaldo;movType)
+  // IMPORTANTE: o composeSaldo aqui é o da PRÓPRIA linha 21 (campo nº8), não o da linha 20.
+  // Uma mesma conta;fonte pode ter movimentações 99 associadas a composeSaldo=1 e composeSaldo=2
+  // separadamente — jamais consolidar entre composeSaldo diferentes.
   const consolidatedMov99 = new Map();
   const seenMov99Keys = new Set();
   for (const line of currentLines) {
     const record = parseRecordCTB(line);
     if (record && record.type === "21" && record.characteristic === "99") {
-      const movTypeKey = `${record.conta};${record.fonte};${record.movType}`;
+      const movTypeKey = `${record.conta};${record.fonte};${record.composeSaldo};${record.movType}`;
       const value = parseNumberCTB(record.value || "0");
       if (seenMov99Keys.has(movTypeKey)) {
         consolidatedMov99.get(movTypeKey).value += value;
@@ -297,7 +300,7 @@ function processCTB(prevText, currText) {
       }
       processedLines.push(buildRecordLineCTB(record));
     } else if (record && record.type === "21" && record.characteristic === "99") {
-      const movTypeKey = `${record.conta};${record.fonte};${record.movType}`;
+      const movTypeKey = `${record.conta};${record.fonte};${record.composeSaldo};${record.movType}`;
       if (!processedMov99Keys.has(movTypeKey)) {
         const consolidated = consolidatedMov99.get(movTypeKey);
         const key = `${record.conta};${record.fonte};${record.composeSaldo}`;
@@ -330,7 +333,7 @@ function processCTB(prevText, currText) {
       const key = `${record.conta};${record.fonte};${record.composeSaldo}`;
       const adjustment = adjustmentsByKey.get(key);
       if (adjustment) {
-        const movTypeKey = `${record.conta};${record.fonte};${adjustment.movType}`;
+        const movTypeKey = `${record.conta};${record.fonte};${record.composeSaldo};${adjustment.movType}`;
         if (!consolidatedMov99.has(movTypeKey) && !createdMov99Keys.has(movTypeKey)) {
           const newMov = {
             type: "21", orgao: record.orgao, conta: record.conta, fonte: record.fonte,
