@@ -39,7 +39,9 @@ function parseNumberCTB(value) {
 }
 
 function formatNumberCTB(value) {
-  return value.toFixed(2).replace(".", ",");
+  const rounded = Math.round(value * 100) / 100;
+  const safe = rounded === 0 ? 0 : rounded; // evita "-0,00"
+  return safe.toFixed(2).replace(".", ",");
 }
 
 // ───────────────────────── CSV genérico ─────────────────────────
@@ -131,7 +133,9 @@ function processEXT(prevText, currText) {
   for (const r of prevRows) {
     if (r[0] !== "20") continue;
     const key = `${r[2]};${r[3]}`;
-    prevMap[key] = signedValue(r[9], r[10]);
+    // Guarda o valor sinalizado E a natureza original (essencial quando o valor é zero,
+    // já que 0 não tem sinal matemático mas o TCE distingue 0,00;C de 0,00;D)
+    prevMap[key] = { signed: signedValue(r[9], r[10]), nat: (r[10] || "D").trim().toUpperCase() };
   }
 
   const rows = currRows.map((r) => [...r]);
@@ -147,7 +151,7 @@ function processEXT(prevText, currText) {
     const debOrig = parseBR(r[7]);
     const credOrig = parseBR(r[8]);
 
-    const novoSi = prevMap[key];
+    const { signed: novoSi, nat: novoSiNatOriginal } = prevMap[key];
     const diff = novoSi - siOrig;
 
     if (Math.abs(diff) < 0.005) continue;
@@ -159,7 +163,12 @@ function processEXT(prevText, currText) {
       novoDeb = 0;
     }
 
-    const { val: siVal, nat: siNat } = toNatural(novoSi);
+    // Natureza do novo saldo inicial: usa a natureza original do saldo final do mês
+    // anterior quando o valor é zero (toNatural não distingue +0 de -0), senão deriva do sinal.
+    const rounded = Math.round(novoSi * 100) / 100;
+    const siVal = formatBR(Math.abs(rounded));
+    const siNat = rounded === 0 ? novoSiNatOriginal : (rounded < 0 ? "C" : "D");
+
     rows[i][5] = siVal;
     rows[i][6] = siNat;
     rows[i][7] = formatBR(novoDeb);
