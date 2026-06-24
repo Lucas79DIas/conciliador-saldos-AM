@@ -540,8 +540,6 @@ export default function App() {
 
           <nav style={{ padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
             <SidebarItem icon="🧾" label="Conciliador" active />
-            <SidebarItem icon="📦" label="Histórico" />
-            <SidebarItem icon="⚙️" label="Configurações" />
           </nav>
         </div>
 
