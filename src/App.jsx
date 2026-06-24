@@ -2,9 +2,11 @@ import { useState, useCallback } from "react";
 import JSZip from "jszip";
 
 const C = {
-  bg: "#0d1117", surface: "#161b22", card: "#1c2128", border: "#30363d",
-  text: "#e6edf3", sub: "#8b949e", muted: "#484f58",
-  green: "#7ee787", red: "#f85149", orange: "#f0883e", blue: "#58a6ff",
+  bg: "#F5F6FA", surface: "#FFFFFF", card: "#FFFFFF", border: "#E6E8F0",
+  text: "#1A1D29", sub: "#6B7280", muted: "#9CA3AF",
+  green: "#16A34A", red: "#DC2626", orange: "#D97706",
+  blue: "#3B5FE0", blueLight: "#EEF1FD", blueDark: "#2541B2",
+  sidebar: "#FFFFFF", sidebarActive: "#F3F4F8",
 };
 
 // ───────────────────────── Helpers numéricos (padrão EXT: vírgula decimal, C/D) ─────────────────────────
@@ -342,14 +344,16 @@ function Btn({ onClick, children, secondary, disabled }) {
       disabled={disabled}
       style={{
         padding: "10px 22px",
-        borderRadius: 6,
+        borderRadius: 8,
         border: secondary ? `1px solid ${C.border}` : "none",
-        background: disabled ? C.muted : secondary ? "transparent" : C.green,
-        color: secondary ? C.text : "#0d1117",
+        background: disabled ? "#D1D5DB" : secondary ? "#FFFFFF" : C.blue,
+        color: secondary ? C.text : "#FFFFFF",
         fontWeight: 600,
         fontSize: 14,
         cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.5 : 1,
+        opacity: disabled ? 0.7 : 1,
+        boxShadow: secondary || disabled ? "none" : "0 1px 2px rgba(59,95,224,0.25)",
+        transition: "background 0.15s ease",
       }}
     >
       {children}
@@ -359,8 +363,12 @@ function Btn({ onClick, children, secondary, disabled }) {
 
 function Card({ title, children }) {
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24, marginBottom: 20 }}>
-      {title && <h2 style={{ fontSize: 16, color: C.text, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>{title}</h2>}
+    <div style={{
+      background: C.card, border: `1px solid ${C.border}`, borderRadius: 12,
+      padding: 24, marginBottom: 20,
+      boxShadow: "0 1px 3px rgba(16,24,40,0.04)",
+    }}>
+      {title && <h2 style={{ fontSize: 16, color: C.text, marginTop: 0, marginBottom: 16, fontWeight: 700 }}>{title}</h2>}
       {children}
     </div>
   );
@@ -371,10 +379,11 @@ function Checkbox({ checked, onChange, label, accent, description }) {
     <label
       style={{
         display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer",
-        padding: "14px 16px", borderRadius: 8,
+        padding: "14px 16px", borderRadius: 10,
         border: `1px solid ${checked ? accent : C.border}`,
-        background: checked ? accent + "11" : "transparent",
+        background: checked ? C.blueLight : "#FAFBFC",
         flex: 1,
+        transition: "all 0.15s ease",
       }}
     >
       <input
@@ -384,7 +393,7 @@ function Checkbox({ checked, onChange, label, accent, description }) {
         style={{ width: 18, height: 18, marginTop: 2, accentColor: accent, cursor: "pointer" }}
       />
       <div>
-        <div style={{ fontWeight: 600, fontSize: 15, color: checked ? accent : C.text }}>{label}</div>
+        <div style={{ fontWeight: 600, fontSize: 15, color: checked ? C.blueDark : C.text }}>{label}</div>
         {description && <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>{description}</div>}
       </div>
     </label>
@@ -402,12 +411,13 @@ function FileDrop({ label, fileName, onFile, accent }) {
         if (f) onFile(f);
       }}
       style={{
-        border: `2px dashed ${fileName ? accent : C.border}`,
-        borderRadius: 10,
+        border: `2px dashed ${fileName ? accent : "#D5D9E3"}`,
+        borderRadius: 12,
         padding: "24px 18px",
         textAlign: "center",
-        background: fileName ? accent + "11" : "transparent",
+        background: fileName ? C.blueLight : "#FAFBFC",
         cursor: "pointer",
+        transition: "all 0.15s ease",
       }}
       onClick={() => document.getElementById(inputId).click()}
     >
@@ -419,7 +429,7 @@ function FileDrop({ label, fileName, onFile, accent }) {
         onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
       />
       <div style={{ fontSize: 13, color: C.sub, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 15, color: fileName ? accent : C.muted, fontWeight: 600 }}>
+      <div style={{ fontSize: 15, color: fileName ? C.blueDark : C.muted, fontWeight: 600 }}>
         {fileName || "Clique ou arraste o ZIP ou CSV"}
       </div>
     </div>
@@ -503,139 +513,227 @@ export default function App() {
   const canContinue = (doExt || doCtb) && prevRaw && currRaw;
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "system-ui, -apple-system, sans-serif", padding: "32px 16px" }}>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif", display: "flex" }}>
 
-        <div style={{ marginBottom: 28 }}>
-          <div style={{ fontSize: 12, color: C.blue, letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>GFI Tech</div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>Conciliador EXT / CTB — Saldo Inicial</h1>
-          <p style={{ color: C.sub, fontSize: 14, marginTop: 6 }}>
-            Envie o pacote (ZIP) ou CSV do mês anterior e do mês atual. Marque qual(is) conciliação(ões) deseja rodar.
-          </p>
-        </div>
-
-        {/* Progress */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-          {[1, 2, 3].map((s) => (
-            <div key={s} style={{ flex: 1, height: 4, borderRadius: 2, background: step >= s ? C.green : C.border }} />
-          ))}
-        </div>
-
-        {/* STEP 1: Seleção + Upload */}
-        {step === 1 && (
-          <Card title="1 · Selecionar conciliações e enviar arquivos">
-            <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-              <Checkbox
-                checked={doExt}
-                onChange={setDoExt}
-                label="Conciliar EXT"
-                description="Extrato bancário — saldo inicial via conta;fonte"
-                accent={C.blue}
-              />
-              <Checkbox
-                checked={doCtb}
-                onChange={setDoCtb}
-                label="Conciliar CTB"
-                description="Contábil — saldo inicial via conta;fonte;composeSaldo"
-                accent={C.orange}
-              />
+      {/* ───────────── Sidebar ───────────── */}
+      <div style={{
+        width: 220, background: C.sidebar, borderRight: `1px solid ${C.border}`,
+        display: "flex", flexDirection: "column", justifyContent: "space-between",
+        position: "sticky", top: 0, height: "100vh", flexShrink: 0,
+      }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "22px 20px 18px" }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 8, background: C.blue,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontWeight: 800, fontSize: 15, flexShrink: 0,
+            }}>
+              GFI
             </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <FileDrop
-                label="Pacote do mês ANTERIOR"
-                fileName={prevFile}
-                onFile={handlePrevFile}
-                accent={C.blue}
-              />
-              <FileDrop
-                label="Pacote do mês ATUAL"
-                fileName={currFile}
-                onFile={handleCurrFile}
-                accent={C.green}
-              />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: C.text, lineHeight: 1.1 }}>Conciliador</div>
+              <div style={{ fontSize: 11, color: C.blue, fontWeight: 500 }}>Saldos AM</div>
             </div>
-
-            <p style={{ color: C.muted, fontSize: 12, marginTop: 14 }}>
-              Pode enviar o ZIP completo da prestação de contas — a aplicação localiza automaticamente o(s) arquivo(s) EXT.CSV e/ou CTB.CSV dentro dele. Também aceita os CSVs soltos.
-            </p>
-
-            <div style={{ marginTop: 20 }}>
-              <Btn onClick={processFiles} disabled={!canContinue || processing}>
-                {processing ? "Processando…" : "Processar →"}
-              </Btn>
-            </div>
-          </Card>
-        )}
-
-        {/* STEP 3: Resultado */}
-        {step === 3 && results && (
-          <Card title="2 · Arquivos corrigidos">
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {results.ext && (
-                <div style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  border: `1px solid ${C.blue}44`, background: C.blue + "11",
-                  borderRadius: 8, padding: "14px 18px",
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 600, color: C.blue }}>EXT_CORRIGIDO.CSV</div>
-                    {resultMeta?.ext?.fromZip && (
-                      <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
-                        extraído de: {resultMeta.ext.sourceName}
-                      </div>
-                    )}
-                  </div>
-                  <Btn onClick={() => downloadCSV(results.ext, "EXT_CORRIGIDO.CSV")}>⬇ Baixar</Btn>
-                </div>
-              )}
-
-              {results.ctb && (
-                <div style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  border: `1px solid ${C.orange}44`, background: C.orange + "11",
-                  borderRadius: 8, padding: "14px 18px",
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 600, color: C.orange }}>CTB_CORRIGIDO.CSV</div>
-                    {resultMeta?.ctb?.fromZip && (
-                      <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
-                        extraído de: {resultMeta.ctb.sourceName}
-                      </div>
-                    )}
-                  </div>
-                  <Btn onClick={() => downloadCSV(results.ctb, "CTB_CORRIGIDO.CSV")}>⬇ Baixar</Btn>
-                </div>
-              )}
-            </div>
-
-            <div style={{ marginTop: 20 }}>
-              <Btn onClick={() => { setStep(1); setResults(null); }} secondary>← Novo processamento</Btn>
-            </div>
-          </Card>
-        )}
-
-        {error && (
-          <div style={{ background: C.red + "15", border: `1px solid ${C.red}44`, borderRadius: 8, padding: 16, color: C.red, marginTop: 16 }}>
-            ⚠ {error}
           </div>
-        )}
 
-        <div style={{
-          marginTop: 40, paddingTop: 18, borderTop: `1px solid ${C.border}`,
-          textAlign: "center", fontSize: 13, color: C.muted,
-        }}>
-          Desenvolvido por <strong style={{ color: C.sub }}>GFI Tech</strong> ·{" "}
-          <a
-            href="https://gfitech.com.br/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: C.blue, textDecoration: "none" }}
-          >
-            conheça nossas ferramentas ↗
+          <div style={{ height: 1, background: C.border, margin: "0 0 10px" }} />
+
+          <nav style={{ padding: "0 10px", display: "flex", flexDirection: "column", gap: 2 }}>
+            <SidebarItem icon="🧾" label="Conciliador" active />
+            <SidebarItem icon="📦" label="Histórico" />
+            <SidebarItem icon="⚙️" label="Configurações" />
+          </nav>
+        </div>
+
+        <div style={{ padding: 16, borderTop: `1px solid ${C.border}` }}>
+          <a href="https://gfitech.com.br/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+              borderRadius: 10, background: C.blueLight, cursor: "pointer",
+            }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: "50%", background: C.blue,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontWeight: 700, fontSize: 12, flexShrink: 0,
+              }}>
+                GT
+              </div>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: C.blueDark }}>GFI Tech</div>
+                <div style={{ fontSize: 11, color: C.sub }}>ver ferramentas ↗</div>
+              </div>
+            </div>
           </a>
         </div>
       </div>
+
+      {/* ───────────── Main content ───────────── */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+
+        {/* Topbar */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "16px 32px", borderBottom: `1px solid ${C.border}`, background: "#fff",
+        }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>Conciliador EXT / CTB</div>
+            <div style={{ fontSize: 13, color: C.sub, marginTop: 1 }}>Correção de saldo inicial 👋</div>
+          </div>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, padding: "8px 16px",
+            borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: C.sub, fontWeight: 500,
+          }}>
+            Prestação de contas
+          </div>
+        </div>
+
+        <div style={{ padding: "28px 32px", maxWidth: 880 }}>
+
+          {/* Progress */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+            {[1, 2, 3].map((s) => (
+              <div key={s} style={{ flex: 1, height: 4, borderRadius: 2, background: step >= s ? C.blue : C.border }} />
+            ))}
+          </div>
+
+          {/* STEP 1: Seleção + Upload */}
+          {step === 1 && (
+            <Card title="Selecionar conciliações e enviar arquivos">
+              <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+                <Checkbox
+                  checked={doExt}
+                  onChange={setDoExt}
+                  label="Conciliar EXT"
+                  description="Extrato bancário — saldo inicial via conta;fonte"
+                  accent={C.blue}
+                />
+                <Checkbox
+                  checked={doCtb}
+                  onChange={setDoCtb}
+                  label="Conciliar CTB"
+                  description="Contábil — saldo inicial via conta;fonte;composeSaldo"
+                  accent={C.blue}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <FileDrop
+                  label="Pacote do mês ANTERIOR"
+                  fileName={prevFile}
+                  onFile={handlePrevFile}
+                  accent={C.blue}
+                />
+                <FileDrop
+                  label="Pacote do mês ATUAL"
+                  fileName={currFile}
+                  onFile={handleCurrFile}
+                  accent={C.blue}
+                />
+              </div>
+
+              <p style={{ color: C.muted, fontSize: 12, marginTop: 14 }}>
+                Pode enviar o ZIP completo da prestação de contas — a aplicação localiza automaticamente o(s) arquivo(s) EXT.CSV e/ou CTB.CSV dentro dele. Também aceita os CSVs soltos.
+              </p>
+
+              <div style={{ marginTop: 20 }}>
+                <Btn onClick={processFiles} disabled={!canContinue || processing}>
+                  {processing ? "Processando…" : "Processar →"}
+                </Btn>
+              </div>
+            </Card>
+          )}
+
+          {/* STEP 3: Resultado */}
+          {step === 3 && results && (
+            <Card title="Arquivos corrigidos">
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {results.ext && (
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    border: `1px solid ${C.border}`, background: C.blueLight,
+                    borderRadius: 10, padding: "14px 18px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <Badge color={C.blue}>EXT</Badge>
+                      <div>
+                        <div style={{ fontWeight: 600, color: C.text }}>EXT_CORRIGIDO.CSV</div>
+                        {resultMeta?.ext?.fromZip && (
+                          <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
+                            extraído de: {resultMeta.ext.sourceName}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <Btn onClick={() => downloadCSV(results.ext, "EXT_CORRIGIDO.CSV")}>⬇ Baixar</Btn>
+                  </div>
+                )}
+
+                {results.ctb && (
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    border: `1px solid ${C.border}`, background: C.blueLight,
+                    borderRadius: 10, padding: "14px 18px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <Badge color={C.blueDark}>CTB</Badge>
+                      <div>
+                        <div style={{ fontWeight: 600, color: C.text }}>CTB_CORRIGIDO.CSV</div>
+                        {resultMeta?.ctb?.fromZip && (
+                          <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
+                            extraído de: {resultMeta.ctb.sourceName}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <Btn onClick={() => downloadCSV(results.ctb, "CTB_CORRIGIDO.CSV")}>⬇ Baixar</Btn>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 20 }}>
+                <Btn onClick={() => { setStep(1); setResults(null); }} secondary>← Novo processamento</Btn>
+              </div>
+            </Card>
+          )}
+
+          {error && (
+            <div style={{ background: "#FEF2F2", border: `1px solid #FCA5A5`, borderRadius: 10, padding: 16, color: C.red, marginTop: 16, fontSize: 14 }}>
+              ⚠ {error}
+            </div>
+          )}
+
+          <div style={{
+            marginTop: 40, paddingTop: 18, borderTop: `1px solid ${C.border}`,
+            textAlign: "center", fontSize: 13, color: C.muted,
+          }}>
+            Desenvolvido por <strong style={{ color: C.sub }}>GFI Tech</strong> ·{" "}
+            <a
+              href="https://gfitech.com.br/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: C.blue, textDecoration: "none", fontWeight: 600 }}
+            >
+              conheça nossas ferramentas ↗
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SidebarItem({ icon, label, active }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 10, padding: "9px 12px",
+      borderRadius: 8, cursor: "pointer",
+      background: active ? C.sidebarActive : "transparent",
+      color: active ? C.text : C.sub,
+      fontWeight: active ? 600 : 500,
+      fontSize: 14,
+    }}>
+      <span style={{ fontSize: 15 }}>{icon}</span>
+      {label}
     </div>
   );
 }
