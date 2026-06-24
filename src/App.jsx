@@ -620,6 +620,21 @@ export default function App() {
             ⚠ {error}
           </div>
         )}
+
+        <div style={{
+          marginTop: 40, paddingTop: 18, borderTop: `1px solid ${C.border}`,
+          textAlign: "center", fontSize: 13, color: C.muted,
+        }}>
+          Desenvolvido por <strong style={{ color: C.sub }}>GFI Tech</strong> ·{" "}
+          <a
+            href="https://gfitech.com.br/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: C.blue, textDecoration: "none" }}
+          >
+            conheça nossas ferramentas ↗
+          </a>
+        </div>
       </div>
     </div>
   );
