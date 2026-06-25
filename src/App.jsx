@@ -191,13 +191,13 @@ function parseRecordCTB(line) {
   const parts = line.split(";");
   if (parts[0] === "20") {
     return {
-      type: "20", orgao: parts[1], conta: parts[2], fonte: parts[3],
+      type: "20", orgao: parts[1], conta: (parts[2] || "").trim(), fonte: (parts[3] || "").trim(),
       composeSaldo: parts[4], saldoInicial: parts[5], saldoFinal: parts[6],
       rawLine: line,
     };
   } else if (parts[0] === "21") {
     return {
-      type: "21", conta: parts[1], fonte: parts[2], movId: parts[3],
+      type: "21", conta: (parts[1] || "").trim(), fonte: (parts[2] || "").trim(), movId: parts[3],
       movType: parts[4], characteristic: parts[5], description: parts[6],
       composeSaldo: parts[7], value: parts[8], rawLine: line,
     };
@@ -223,12 +223,25 @@ function processCTB(prevText, currText) {
   const currentLines = currText.split(/\r?\n/).filter((l) => l.trim());
 
   // Mapeia saldos finais do mês anterior (sempre normalizado com 2 casas decimais)
+  // Guarda também o "orgao" original, necessário caso a conta precise ser recriada no mês atual.
   const previousBalances = new Map();
+  const previousOrgao = new Map();
   for (const line of previousLines) {
     const record = parseRecordCTB(line);
     if (record && record.type === "20") {
       const key = `${record.conta};${record.fonte};${record.composeSaldo}`;
       previousBalances.set(key, formatNumberCTB(parseNumberCTB(record.saldoFinal || "0")));
+      previousOrgao.set(key, record.orgao);
+    }
+  }
+
+  // Chaves (conta;fonte;composeSaldo) presentes no mês atual — usado para detectar
+  // contas que existiam no mês anterior mas desapareceram no mês atual.
+  const currentKeys = new Set();
+  for (const line of currentLines) {
+    const record = parseRecordCTB(line);
+    if (record && record.type === "20") {
+      currentKeys.add(`${record.conta};${record.fonte};${record.composeSaldo}`);
     }
   }
 
@@ -346,6 +359,35 @@ function processCTB(prevText, currText) {
         }
       }
     }
+  }
+
+  // Contas que existiam no mês anterior (com saldo final ≠ 0) mas desapareceram no mês atual:
+  // cria a linha 20 (saldo inicial = saldo final anterior, saldo final = 0,00) e a movimentação
+  // 99 necessária para zerar o saldo, preservando a natureza/sinal do saldo anterior.
+  for (const [key, saldoFinalAnteriorStr] of previousBalances) {
+    if (currentKeys.has(key)) continue; // já existe no mês atual, nada a fazer aqui
+
+    const saldoFinalAnteriorNum = parseNumberCTB(saldoFinalAnteriorStr);
+    if (Math.abs(saldoFinalAnteriorNum) < 0.005) continue; // já era zero, não precisa recriar
+
+    const [conta, fonte, composeSaldo] = key.split(";");
+    const orgao = previousOrgao.get(key) || "05";
+
+    // Movimentação necessária para zerar: se saldo positivo, precisa de SAÍDA (movType=2);
+    // se negativo, precisa de ENTRADA (movType=1) — o inverso do sinal do saldo.
+    const movType = saldoFinalAnteriorNum > 0 ? "2" : "1";
+    const valorAbsoluto = formatNumberCTB(Math.abs(saldoFinalAnteriorNum));
+
+    finalLines.push(buildRecordLineCTB({
+      type: "20", orgao, conta, fonte, composeSaldo,
+      saldoInicial: saldoFinalAnteriorStr, saldoFinal: "0,00",
+    }));
+    finalLines.push(buildRecordLineCTB({
+      type: "21", orgao, conta, fonte,
+      movId: generateMovId(), movType, characteristic: "99",
+      description: "TRANSFERENCIA FINANCEIRA", composeSaldo,
+      value: valorAbsoluto,
+    }));
   }
 
   return finalLines.join("\r\n") + "\r\n";
