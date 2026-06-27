@@ -125,17 +125,28 @@ async function resolveTargetFile(file, targetName) {
 // Critério de chave: conta;fonte (apenas linhas tipo 20)
 // Substitui saldo inicial pelo saldo final do mês anterior, absorvendo a diferença
 // no débito (ou, se ficasse negativo, no crédito), preservando o saldo final.
+// Contas que existiam no mês anterior (saldo final != 0) mas desapareceram no mês
+// atual são recriadas já zeradas, com a movimentação necessária para chegar a zero.
 function processEXT(prevText, currText) {
   const prevRows = parseCSV(prevText);
   const currRows = parseCSV(currText);
 
   const prevMap = {};
+  const prevOrgao = {};
   for (const r of prevRows) {
     if (r[0] !== "20") continue;
     const key = `${r[2]};${r[3]}`;
     // Guarda o valor sinalizado E a natureza original (essencial quando o valor é zero,
     // já que 0 não tem sinal matemático mas o TCE distingue 0,00;C de 0,00;D)
     prevMap[key] = { signed: signedValue(r[9], r[10]), nat: (r[10] || "D").trim().toUpperCase() };
+    prevOrgao[key] = r[1];
+  }
+
+  // Chaves conta;fonte presentes no mês atual (para detectar contas ausentes)
+  const currentKeys = new Set();
+  for (const r of currRows) {
+    if (r[0] !== "20") continue;
+    currentKeys.add(`${r[2]};${r[3]}`);
   }
 
   const rows = currRows.map((r) => [...r]);
@@ -174,6 +185,40 @@ function processEXT(prevText, currText) {
     rows[i][7] = formatBR(novoDeb);
     rows[i][8] = formatBR(novoCred);
     // saldo final (colunas 9/10) permanece inalterado
+  }
+
+  // Contas que existiam no mês anterior (saldo final != 0) e desapareceram no mês atual:
+  // cria a linha 20 com saldo inicial = saldo final anterior, e débito/crédito
+  // ajustados para zerar o saldo final, preservando a natureza original quando zero.
+  for (const key in prevMap) {
+    if (currentKeys.has(key)) continue; // já existe no mês atual, nada a fazer
+
+    const { signed: saldoFinalAnterior, nat: natOriginal } = prevMap[key];
+    if (Math.abs(saldoFinalAnterior) < 0.005) continue; // já era zero, não precisa recriar
+
+    const [conta, fonte] = key.split(";");
+    const orgao = prevOrgao[key] || "05";
+
+    const rounded = Math.round(saldoFinalAnterior * 100) / 100;
+    const siVal = formatBR(Math.abs(rounded));
+    const siNat = rounded < 0 ? "C" : "D";
+
+    // Para zerar o saldo: se saldo inicial positivo, lança no crédito (diminui);
+    // se negativo, lança no débito (aumenta) — valor absoluto exato do saldo.
+    let novoDeb = "0,00";
+    let novoCred = "0,00";
+    if (rounded > 0) {
+      novoCred = formatBR(rounded);
+    } else if (rounded < 0) {
+      novoDeb = formatBR(Math.abs(rounded));
+    }
+
+    rows.push([
+      "20", orgao, conta, fonte, " ",
+      siVal, siNat,
+      novoDeb, novoCred,
+      "0,00", "D",
+    ]);
   }
 
   return serializeCSV(rows);
